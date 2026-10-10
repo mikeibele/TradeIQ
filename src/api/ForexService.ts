@@ -33,7 +33,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "EUR/USD",
         current_price: 1.08542,
         spread: 1.2, // pips
-        image: "https://img.icons8.com/color/96/euro.png",
+        image: "https://flagcdn.com/w160/eu.png",
         pipDecimalPlaces: 5
     },
     {
@@ -42,7 +42,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "GBP/USD",
         current_price: 1.26857,
         spread: 1.5,
-        image: "https://img.icons8.com/color/96/pound-sterling.png",
+        image: "https://flagcdn.com/w160/gb.png",
         pipDecimalPlaces: 5
     },
     {
@@ -51,7 +51,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "USD/JPY",
         current_price: 157.425,
         spread: 1.8,
-        image: "https://img.icons8.com/color/96/yen.png",
+        image: "https://flagcdn.com/w160/jp.png",
         pipDecimalPlaces: 3
     },
     {
@@ -60,7 +60,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "AUD/USD",
         current_price: 0.66482,
         spread: 1.4,
-        image: "https://img.icons8.com/color/96/australian-dollar.png",
+        image: "https://flagcdn.com/w160/au.png",
         pipDecimalPlaces: 5
     },
     {
@@ -69,7 +69,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "USD/CAD",
         current_price: 1.36544,
         spread: 1.6,
-        image: "https://img.icons8.com/color/96/canadian-dollar.png",
+        image: "https://flagcdn.com/w160/ca.png",
         pipDecimalPlaces: 5
     },
     {
@@ -78,7 +78,7 @@ const INITIAL_PAIRS: Omit<ForexPair, 'bid' | 'ask' | 'price_change_24h' | 'price
         symbol: "EUR/GBP",
         current_price: 0.85561,
         spread: 1.3,
-        image: "https://img.icons8.com/color/96/great-britain.png",
+        image: "https://flagcdn.com/w160/eu.png",
         pipDecimalPlaces: 5
     }
 ];

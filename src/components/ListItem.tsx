@@ -87,6 +87,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         borderWidth: 1,
         borderColor: "rgba(255, 255, 255, 0.1)",
+        overflow: "hidden",
     },
     logo: {
         width: 28,
@@ -136,4 +137,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ListItem;
+export default React.memo(ListItem);

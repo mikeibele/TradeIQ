@@ -1,5 +1,5 @@
 import {
-    View, TouchableWithoutFeedback, Keyboard, Text, TextInput, FlatList,
+    View, Platform, Keyboard, Text, TextInput, FlatList,
     ActivityIndicator, RefreshControl, StyleSheet, Image, TouchableOpacity, ScrollView,
     DeviceEventEmitter,
 } from "react-native";
@@ -18,13 +18,16 @@ import { AntDesign, Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { getMarketData, tickRates, ForexPair } from "../src/api/ForexService";
 import { getTrades, getStats, resetTrades, clearAllTrades, Trade, TraderStats } from "../src/api/JournalStore";
 
-const debounce = (func: Function, delay: number) => {
-    let timeout: NodeJS.Timeout;
-    return (...args: any[]) => {
+function debounce<T extends (...args: Parameters<T>) => void>(
+    func: T,
+    delay: number
+): (...args: Parameters<T>) => void {
+    let timeout: ReturnType<typeof setTimeout>;
+    return (...args: Parameters<T>) => {
         clearTimeout(timeout);
         timeout = setTimeout(() => func(...args), delay);
     };
-};
+}
 
 export default function MarketScreen() {
     const router = useRouter();
@@ -115,19 +118,20 @@ export default function MarketScreen() {
     }, []);
 
     // Handle Search Query Filter
-    const handleSearchQueryChange = useCallback(
-        debounce((query: string) => {
-            setSearchQuery(query);
-            if (query.trim() !== "") {
-                const results = data.filter((pair: ForexPair) =>
-                    pair.symbol.toLowerCase().includes(query.toLowerCase()) ||
-                    pair.name.toLowerCase().includes(query.toLowerCase())
-                );
-                setSearchResults(results);
-            } else {
-                setSearchResults([]);
-            }
-        }, 300),
+    const handleSearchQueryChange = useMemo(
+        () =>
+            debounce((query: string) => {
+                setSearchQuery(query);
+                if (query.trim() !== "") {
+                    const results = data.filter((pair: ForexPair) =>
+                        pair.symbol.toLowerCase().includes(query.toLowerCase()) ||
+                        pair.name.toLowerCase().includes(query.toLowerCase())
+                    );
+                    setSearchResults(results);
+                } else {
+                    setSearchResults([]);
+                }
+            }, 300),
         [data]
     );
 
@@ -147,6 +151,19 @@ export default function MarketScreen() {
             }
         });
     }, [router]);
+
+    const renderItem = useCallback(({ item }: { item: ForexPair }) => (
+        <ListItem
+            name={item.name}
+            symbol={item.symbol}
+            currentPrice={item.current_price}
+            logoUrl={item.image}
+            priceChangePercentage7d={item.price_change_percentage_7d_in_currency}
+            pipDecimalPlaces={item.pipDecimalPlaces}
+            spread={item.spread}
+            onPress={() => navigateToDetails(item)}
+        />
+    ), [navigateToDetails]);
 
     const onRefresh = async () => {
         setIsRefreshing(true);
@@ -188,198 +205,186 @@ export default function MarketScreen() {
     );
 
     return (
-        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-            <View style={styles.container}>
-                <StatusBar style="light" />
-                <LinearGradient
-                    colors={[ColorTheme.gradientStart, ColorTheme.gradientEnd]}
-                    style={StyleSheet.absoluteFillObject}
-                />
+        <View style={styles.container}>
+            <StatusBar style="light" />
+            <LinearGradient
+                colors={[ColorTheme.gradientStart, ColorTheme.gradientEnd]}
+                style={StyleSheet.absoluteFill}
+            />
 
-                <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-                    <FlatList
-                        keyExtractor={(item) => item.id}
-                        data={displayedPairs}
-                        ListHeaderComponent={
-                            <>
-                                {/* Header: Profile */}
-                                <View style={styles.header}>
-                                    <View style={styles.profileSection}>
-                                        <View style={styles.avatarBorder}>
-                                            <Image
-                                                source={{ uri: 'https://i.pravatar.cc/150?u=trader1' }}
-                                                style={styles.avatar}
-                                            />
-                                        </View>
-                                        <View style={styles.profileInfo}>
-                                            <View style={styles.nameRow}>
-                                                <Text style={styles.fullName}>Samuel B. (Demo Account)</Text>
-                                                <SymbolView name="checkmark.seal.fill" size={14} tintColor={ColorTheme.accentYellow} />
-                                            </View>
-                                            <Text style={styles.traderRank}>Senior Risk Manager</Text>
-                                        </View>
-                                    </View>
-                                    <TouchableOpacity style={styles.supportBtn}>
-                                        <Ionicons name="information-circle-outline" size={22} color="white" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Performance Metrics Panel */}
-                                <View style={styles.performanceDashboard}>
-                                    <Text style={styles.dashboardLabel}>PORTFOLIO EQUITY</Text>
-                                    <Text style={styles.balanceText}>
-                                        ${stats.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </Text>
-
-                                    <View style={styles.pnlBadgeContainer}>
-                                        <View style={[
-                                            styles.pnlBadge,
-                                            { backgroundColor: stats.netPnl >= 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)' }
-                                        ]}>
-                                            <Text style={[
-                                                styles.pnlText,
-                                                { color: stats.netPnl >= 0 ? ColorTheme.trendingGreen : ColorTheme.trendingRed }
-                                            ]}>
-                                                {stats.netPnl >= 0 ? '+' : ''}${stats.netPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({stats.netPnlPercent.toFixed(2)}%)
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Stats Grid */}
-                                    <View style={styles.statsGrid}>
-                                        <View style={styles.statsCard}>
-                                            <Text style={styles.statsCardLabel}>Win Rate</Text>
-                                            <Text style={[styles.statsCardVal, { color: ColorTheme.chartGold }]}>{stats.winRate.toFixed(1)}%</Text>
-                                        </View>
-                                        <View style={styles.statsCard}>
-                                            <Text style={styles.statsCardLabel}>Drawdown</Text>
-                                            <Text style={[styles.statsCardVal, { color: ColorTheme.trendingRed }]}>{stats.drawdown.toFixed(2)}%</Text>
-                                        </View>
-                                        <View style={styles.statsCard}>
-                                            <Text style={styles.statsCardLabel}>Total Trades</Text>
-                                            <Text style={styles.statsCardVal}>{stats.totalTrades}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Quick Actions */}
-                                <View style={styles.actionsGrid}>
-                                    <ActionButton
-                                        icon="arrow.down.right.circle.fill"
-                                        label="Calculate Risk"
-                                        onPress={() => router.push("/deposit")}
-                                        color={ColorTheme.vibrantPurple}
-                                    />
-                                    <ActionButton
-                                        icon="arrow.counterclockwise.circle.fill"
-                                        label="Reset Journal"
-                                        onPress={handleResetJournal}
-                                        color={ColorTheme.chartGold}
-                                    />
-                                    <ActionButton
-                                        icon="trash.circle.fill"
-                                        label="Clear Journal"
-                                        onPress={handleClearJournal}
-                                        color={ColorTheme.trendingRed}
-                                    />
-                                </View>
-
-                                {/* Search Bar */}
-                                <View style={styles.searchContainer}>
-                                    <View style={styles.searchInner}>
-                                        <SymbolView name="magnifyingglass" size={18} tintColor={ColorTheme.grey} />
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search major/minor forex pairs..."
-                                            placeholderTextColor={ColorTheme.grey}
-                                            defaultValue={searchQuery}
-                                            onChangeText={handleSearchQueryChange}
+            <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+                <FlatList
+                    keyExtractor={(item) => item.id}
+                    data={displayedPairs}
+                    renderItem={renderItem}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                    ListHeaderComponent={
+                        <>
+                            {/* Header: Profile */}
+                            <View style={styles.header}>
+                                <View style={styles.profileSection}>
+                                    <View style={styles.avatarBorder}>
+                                        <Image
+                                            source={{ uri: 'https://i.pravatar.cc/150?u=trader1' }}
+                                            style={styles.avatar}
                                         />
                                     </View>
-                                </View>
-
-                                {/* Coin List Section */}
-                                <View style={styles.listHeader}>
-                                    <Text style={styles.listTitle}>Live Currency Rates</Text>
-                                    <View style={styles.liveIndicator}>
-                                        <View style={styles.liveDot} />
-                                        <Text style={styles.liveText}>REALTIME</Text>
+                                    <View style={styles.profileInfo}>
+                                        <View style={styles.nameRow}>
+                                            <Text style={styles.fullName}>Samuel B. (Demo Account)</Text>
+                                            <SymbolView name="checkmark.seal.fill" size={14} tintColor={ColorTheme.accentYellow} />
+                                        </View>
+                                        <Text style={styles.traderRank}>Senior Risk Manager</Text>
                                     </View>
                                 </View>
-                            </>
-                        }
-                        renderItem={({ item }) => {
-                            return (
-                                <ListItem
-                                    name={item.name}
-                                    symbol={item.symbol}
-                                    currentPrice={item.current_price}
-                                    logoUrl={item.image}
-                                    priceChangePercentage7d={item.price_change_percentage_7d_in_currency}
-                                    pipDecimalPlaces={item.pipDecimalPlaces}
-                                    spread={item.spread}
-                                    onPress={() => navigateToDetails(item)}
+                                <TouchableOpacity style={styles.supportBtn}>
+                                    <Ionicons name="information-circle-outline" size={22} color="white" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Performance Metrics Panel */}
+                            <View style={styles.performanceDashboard}>
+                                <Text style={styles.dashboardLabel}>PORTFOLIO EQUITY</Text>
+                                <Text style={styles.balanceText}>
+                                    ${stats.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+
+                                <View style={styles.pnlBadgeContainer}>
+                                    <View style={[
+                                        styles.pnlBadge,
+                                        { backgroundColor: stats.netPnl >= 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)' }
+                                    ]}>
+                                        <Text style={[
+                                            styles.pnlText,
+                                            { color: stats.netPnl >= 0 ? ColorTheme.trendingGreen : ColorTheme.trendingRed }
+                                        ]}>
+                                            {stats.netPnl >= 0 ? '+' : ''}${stats.netPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({stats.netPnlPercent.toFixed(2)}%)
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Stats Grid */}
+                                <View style={styles.statsGrid}>
+                                    <View style={styles.statsCard}>
+                                        <Text style={styles.statsCardLabel}>Win Rate</Text>
+                                        <Text style={[styles.statsCardVal, { color: ColorTheme.chartGold }]}>{stats.winRate.toFixed(1)}%</Text>
+                                    </View>
+                                    <View style={styles.statsCard}>
+                                        <Text style={styles.statsCardLabel}>Drawdown</Text>
+                                        <Text style={[styles.statsCardVal, { color: ColorTheme.trendingRed }]}>{stats.drawdown.toFixed(2)}%</Text>
+                                    </View>
+                                    <View style={styles.statsCard}>
+                                        <Text style={styles.statsCardLabel}>Total Trades</Text>
+                                        <Text style={styles.statsCardVal}>{stats.totalTrades}</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Quick Actions */}
+                            <View style={styles.actionsGrid}>
+                                <ActionButton
+                                    icon="arrow.down.right.circle.fill"
+                                    label="Calculate Risk"
+                                    onPress={() => router.push("/deposit")}
+                                    color={ColorTheme.vibrantPurple}
                                 />
-                            );
-                        }}
-                        ListFooterComponent={
-                            <View style={styles.footerContainer}>
-                                <Text style={styles.journalHeader}>Performance Trade Journal</Text>
+                                <ActionButton
+                                    icon="arrow.counterclockwise.circle.fill"
+                                    label="Reset Journal"
+                                    onPress={handleResetJournal}
+                                    color={ColorTheme.chartGold}
+                                />
+                                <ActionButton
+                                    icon="trash.circle.fill"
+                                    label="Clear Journal"
+                                    onPress={handleClearJournal}
+                                    color={ColorTheme.trendingRed}
+                                />
+                            </View>
 
-                                {trades.length === 0 ? (
-                                    <View style={styles.emptyJournal}>
-                                        <Ionicons name="journal-outline" size={40} color={ColorTheme.grey} />
-                                        <Text style={styles.emptyJournalText}>No logged trades found</Text>
-                                        <Text style={styles.emptyJournalSub}>Add trades using details screen or risk calculator.</Text>
-                                    </View>
-                                ) : (
-                                    <View style={styles.journalList}>
-                                        {trades.map((trade) => {
-                                            const isWin = trade.status === 'WIN';
-                                            return (
-                                                <View key={trade.id} style={styles.journalItem}>
-                                                    <View style={styles.journalLeft}>
-                                                        <View style={[styles.typeBadge, { backgroundColor: trade.type === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }]}>
-                                                            <Text style={[styles.typeBadgeText, { color: trade.type === 'BUY' ? ColorTheme.trendingGreen : ColorTheme.trendingRed }]}>
-                                                                {trade.type}
-                                                            </Text>
-                                                        </View>
-                                                        <View style={{ marginLeft: 10 }}>
-                                                            <Text style={styles.journalSymbol}>{trade.symbol}</Text>
-                                                            <Text style={styles.journalMeta}>{trade.lots.toFixed(2)} Lots @ {trade.entryPrice.toFixed(trade.symbol === 'USD/JPY' ? 3 : 5)}</Text>
-                                                        </View>
+                            {/* Search Bar */}
+                            <View style={styles.searchContainer}>
+                                <View style={styles.searchInner}>
+                                    <SymbolView name="magnifyingglass" size={18} tintColor={ColorTheme.grey} />
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="Search major/minor forex pairs..."
+                                        placeholderTextColor={ColorTheme.grey}
+                                        defaultValue={searchQuery}
+                                        onChangeText={handleSearchQueryChange}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Coin List Section */}
+                            <View style={styles.listHeader}>
+                                <Text style={styles.listTitle}>Live Currency Rates</Text>
+                                <View style={styles.liveIndicator}>
+                                    <View style={styles.liveDot} />
+                                    <Text style={styles.liveText}>REALTIME</Text>
+                                </View>
+                            </View>
+                        </>
+                    }
+                    ListFooterComponent={
+                        <View style={styles.footerContainer}>
+                            <Text style={styles.journalHeader}>Performance Trade Journal</Text>
+
+                            {trades.length === 0 ? (
+                                <View style={styles.emptyJournal}>
+                                    <Ionicons name="journal-outline" size={40} color={ColorTheme.grey} />
+                                    <Text style={styles.emptyJournalText}>No logged trades found</Text>
+                                    <Text style={styles.emptyJournalSub}>Add trades using details screen or risk calculator.</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.journalList}>
+                                    {trades.map((trade) => {
+                                        const isWin = trade.status === 'WIN';
+                                        return (
+                                            <View key={trade.id} style={styles.journalItem}>
+                                                <View style={styles.journalLeft}>
+                                                    <View style={[styles.typeBadge, { backgroundColor: trade.type === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }]}>
+                                                        <Text style={[styles.typeBadgeText, { color: trade.type === 'BUY' ? ColorTheme.trendingGreen : ColorTheme.trendingRed }]}>
+                                                            {trade.type}
+                                                        </Text>
                                                     </View>
-
-                                                    <View style={styles.journalRight}>
-                                                        <Text style={[styles.journalPnl, { color: isWin ? ColorTheme.trendingGreen : ColorTheme.trendingRed }]}>
-                                                            {isWin ? '+' : ''}${trade.pnl.toFixed(2)}
-                                                        </Text>
-                                                        <Text style={styles.journalDate}>
-                                                            {new Date(trade.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                        </Text>
+                                                    <View style={{ marginLeft: 10 }}>
+                                                        <Text style={styles.journalSymbol}>{trade.symbol}</Text>
+                                                        <Text style={styles.journalMeta}>{trade.lots.toFixed(2)} Lots @ {trade.entryPrice.toFixed(trade.symbol === 'USD/JPY' ? 3 : 5)}</Text>
                                                     </View>
                                                 </View>
-                                            );
-                                        })}
-                                    </View>
-                                )}
-                            </View>
-                        }
-                        contentContainerStyle={{ paddingBottom: 100 }}
-                        initialNumToRender={10}
-                        windowSize={5}
-                        removeClippedSubviews={false}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={isRefreshing}
-                                onRefresh={onRefresh}
-                                tintColor={ColorTheme.accentYellow}
-                            />
-                        }
-                    />
-                </SafeAreaView>
-            </View>
-        </TouchableWithoutFeedback>
+
+                                                <View style={styles.journalRight}>
+                                                    <Text style={[styles.journalPnl, { color: isWin ? ColorTheme.trendingGreen : ColorTheme.trendingRed }]}>
+                                                        {isWin ? '+' : ''}${trade.pnl.toFixed(2)}
+                                                    </Text>
+                                                    <Text style={styles.journalDate}>
+                                                        {new Date(trade.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                        </View>
+                    }
+                    contentContainerStyle={{ paddingBottom: 100 }}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={onRefresh}
+                            tintColor={ColorTheme.accentYellow}
+                        />
+                    }
+                />
+            </SafeAreaView>
+        </View>
     );
 }
 

@@ -37,7 +37,7 @@ export default function DetailsScreen() {
     const [livePnl, setLivePnl] = useState(0);
     const [initialTradePrice, setInitialTradePrice] = useState(0);
     const [countdown, setCountdown] = useState(0);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Simulate price fluctuation in details page
     useEffect(() => {
@@ -118,7 +118,7 @@ export default function DetailsScreen() {
             <StatusBar style="light" />
             <LinearGradient
                 colors={["#1B0D36", "black"]}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 start={{ x: 0.5, y: 0 }}
                 end={{ x: 0.5, y: 0.5 }}
             />
