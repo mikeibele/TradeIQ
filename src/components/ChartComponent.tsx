@@ -1,15 +1,9 @@
-import { View, Text, Image, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
 import React from "react";
 import ColorTheme from "../config/ColorTheme";
-import { responsiveScreenFontSize, responsiveScreenHeight, responsiveScreenWidth } from "react-native-responsive-dimensions";
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line, Circle } from "react-native-svg";
+import Svg, { Path, Line, Circle } from "react-native-svg";
 import { SymbolView } from "expo-symbols";
 import { LinearGradient } from "expo-linear-gradient";
-
-interface SparklinePoint {
-    x: number;
-    y: number;
-}
 
 interface ChartComponentProps {
     currentPrice: number;
@@ -28,28 +22,60 @@ const { width } = Dimensions.get("window");
 
 const ChartComponent: React.FC<ChartComponentProps> = ({
     currentPrice,
-    logoUrl,
+    logoUrl, // Note: not used anymore as we display nice flags/icons derived or currency symbols in text
     name,
     symbol,
-    priceChangePercentage7d,
     sparkLine,
     high_24h,
     low_24h,
-    price_change_24h,
     price_change_percentage_24h,
 }) => {
     const isPositive = price_change_percentage_24h > 0;
     const changeColor = isPositive ? ColorTheme.trendingGreen : ColorTheme.trendingRed;
+    const isJpy = symbol.includes("JPY");
+    const decimalPlaces = isJpy ? 3 : 5;
+
+    // Timeframe selector state
+    const [activeInterval, setActiveInterval] = React.useState("1H");
+    const [localSparkline, setLocalSparkline] = React.useState<any[]>(sparkLine);
+
+    React.useEffect(() => {
+        setLocalSparkline(sparkLine);
+    }, [sparkLine]);
+
+    const handleIntervalChange = (interval: string) => {
+        setActiveInterval(interval);
+
+        let multiplier = 0.005; // 1H default
+        if (interval === "1M") multiplier = 0.0006;
+        else if (interval === "5M") multiplier = 0.0012;
+        else if (interval === "15M") multiplier = 0.0025;
+        else if (interval === "4H") multiplier = 0.015;
+        else if (interval === "1D") multiplier = 0.035;
+
+        // Generate mock points based on interval
+        const pointsCount = 30;
+        const newPoints: number[] = [];
+        let priceTracker = currentPrice * (1 - multiplier * 0.5);
+
+        for (let i = 0; i < pointsCount; i++) {
+            const changePercent = (Math.random() - 0.485) * (multiplier * 0.15);
+            priceTracker = priceTracker * (1 + changePercent);
+            newPoints.push(priceTracker);
+        }
+        newPoints[newPoints.length - 1] = currentPrice;
+        setLocalSparkline(newPoints);
+    };
 
     // Chart logic
-    const chartHeight = 220;
+    const chartHeight = 200;
     const chartWidth = width - 40;
 
     let pathData = "";
     let lastPoint = { x: 0, y: 0 };
 
-    if (sparkLine && sparkLine.length > 1) {
-        const prices: number[] = sparkLine.map(p => typeof p === 'object' ? p.y : p).filter(p => !isNaN(p));
+    if (localSparkline && localSparkline.length > 1) {
+        const prices: number[] = localSparkline.map(p => typeof p === 'object' ? p.y : p).filter(p => !isNaN(p));
 
         if (prices.length > 1) {
             const min = Math.min(...prices);
@@ -67,97 +93,109 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
         }
     }
 
+    // Today's Range Calculation
+    const rangeSpan = high_24h - low_24h || 0.001;
+    const currentOffsetPercent = Math.min(Math.max(((currentPrice - low_24h) / rangeSpan) * 100, 0), 100);
+
+    // Bid/Ask Spread values
+    const spreadOffset = isJpy ? 0.012 : 0.00012; // Spread around 1.2 pips
+    const bidPrice = currentPrice - spreadOffset / 2;
+    const askPrice = currentPrice + spreadOffset / 2;
+
     return (
         <View style={styles.container}>
-            {/* Background Gradient at top */}
+            {/* Background Gradient */}
             <LinearGradient
-                colors={["#2D1B4D", "transparent"]}
+                colors={["#0F0824", "transparent"]}
                 style={styles.topGradient}
             />
 
-            {/* Top Info Section */}
+            {/* Header info */}
             <View style={styles.header}>
-                <View style={styles.iconContainer}>
-                    <Image source={{ uri: logoUrl }} style={styles.logo} />
+                <View style={styles.titleRow}>
+                    <Text style={styles.symbolText}>{symbol}</Text>
+                    <Text style={styles.nameText}>{name.split(" (")[0]}</Text>
                 </View>
-                <Text style={styles.title}>{symbol.toUpperCase()} ({name})</Text>
 
                 <View style={styles.priceContainer}>
                     <Text style={styles.priceMainText}>
-                        {currentPrice.toLocaleString("en-US", { minimumFractionDigits: 5 })} {symbol.toUpperCase()}
+                        {currentPrice.toFixed(decimalPlaces)}
                     </Text>
-                    <View style={[styles.changeBadge, { backgroundColor: isPositive ? "#14532d" : "#450a0a" }]}>
+                    <View style={[styles.changeBadge, { backgroundColor: isPositive ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)" }]}>
                         <SymbolView
                             name={isPositive ? "arrow.up" : "arrow.down"}
-                            size={10}
+                            size={12}
                             tintColor={changeColor}
                         />
                         <Text style={[styles.changeText, { color: changeColor }]}>
-                            {isPositive ? "" : "- "}{Math.abs(price_change_percentage_24h).toFixed(2)}%
+                            {isPositive ? "+" : ""}{price_change_percentage_24h.toFixed(2)}%
                         </Text>
                     </View>
                 </View>
             </View>
 
-            {/* Chart Section */}
+            {/* Chart Wrapper */}
             <View style={styles.chartWrapper}>
                 <Svg height={chartHeight} width={chartWidth}>
                     {/* Grid Lines */}
-                    {[0.2, 0.4, 0.6, 0.8].map((percent, idx) => (
+                    {[0.25, 0.5, 0.75].map((percent, idx) => (
                         <Line
                             key={idx}
                             x1="0"
                             y1={chartHeight * percent}
                             x2={chartWidth}
                             y2={chartHeight * percent}
-                            stroke="#1A1A1A"
+                            stroke="#1F1535"
                             strokeWidth="1"
-                            strokeDasharray="5, 5"
+                            strokeDasharray="4, 4"
                         />
                     ))}
 
-                    {/* Golden Path */}
-                    <Path
-                        d={pathData}
-                        fill="none"
-                        stroke={ColorTheme.chartGold}
-                        strokeWidth="3"
-                    />
+                    {/* Path */}
+                    {pathData !== "" && (
+                        <Path
+                            d={pathData}
+                            fill="none"
+                            stroke={ColorTheme.chartGold}
+                            strokeWidth="2.5"
+                        />
+                    )}
 
-                    {/* Endpoint dot with glow */}
+                    {/* Laser point endpoint */}
                     {lastPoint.x !== 0 && (
                         <>
                             <Circle
                                 cx={lastPoint.x}
                                 cy={lastPoint.y}
-                                r="6"
+                                r="5"
                                 fill={ColorTheme.chartGold}
                             />
                             <Circle
                                 cx={lastPoint.x}
                                 cy={lastPoint.y}
-                                r="12"
+                                r="10"
                                 fill={ColorTheme.chartGold}
-                                opacity={0.3}
+                                opacity={0.25}
                             />
                         </>
                     )}
                 </Svg>
             </View>
 
-            {/* Time Interval Selectors */}
+            {/* Timeframes */}
             <View style={styles.timeIntervals}>
-                {["1H", "1D", "1W", "1M", "1Y"].map((interval) => (
+                {["1M", "5M", "15M", "1H", "4H", "1D"].map((interval) => (
                     <TouchableOpacity
                         key={interval}
                         style={[
                             styles.intervalBtn,
-                            interval === "1D" && styles.activeIntervalBtn
+                            interval === activeInterval && styles.activeIntervalBtn
                         ]}
+                        onPress={() => handleIntervalChange(interval)}
                     >
                         <Text style={[
                             styles.intervalText,
-                            interval === "1D" && styles.activeIntervalText
+                            interval === activeInterval && styles.activeIntervalText
                         ]}>
                             {interval}
                         </Text>
@@ -165,39 +203,34 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
                 ))}
             </View>
 
-            {/* Balance and Value Section */}
-            <View style={styles.balanceInfo}>
-                <View style={styles.infoCol}>
-                    <Text style={styles.infoLabel}>Balance</Text>
-                    <View style={styles.infoValueRow}>
-                        <Image source={{ uri: logoUrl }} style={styles.infoIcon} />
-                        <Text style={styles.infoValue}>{currentPrice.toLocaleString("en-US", { minimumFractionDigits: 5 })}</Text>
-                    </View>
+            {/* Today's Range Slider */}
+            <View style={styles.rangeContainer}>
+                <View style={styles.rangeRow}>
+                    <Text style={styles.rangeLabel}>Today's Range</Text>
                 </View>
-                <View style={styles.verticalDivider} />
-                <View style={styles.infoCol}>
-                    <Text style={styles.infoLabel}>Value</Text>
-                    <View style={styles.infoValueRow}>
-                        <View style={styles.dollarIconWrapper}>
-                            <Text style={styles.dollarIcon}>$</Text>
-                        </View>
-                        <Text style={styles.infoValue}>$37.42</Text>
-                    </View>
+                <View style={styles.rangeBarTrack}>
+                    <View style={[styles.rangeBarActive, { left: `${currentOffsetPercent}%` }]} />
+                </View>
+                <View style={styles.rangePriceRow}>
+                    <Text style={styles.rangePriceText}>L: {low_24h.toFixed(decimalPlaces)}</Text>
+                    <Text style={styles.rangePriceText}>H: {high_24h.toFixed(decimalPlaces)}</Text>
                 </View>
             </View>
 
-            <Text style={styles.walletNote}>
-                In Your Wallet <Text style={{ color: 'white', fontWeight: 'bold' }}>You</Text>
-            </Text>
-
-            {/* Actions Section */}
-            <View style={styles.actions}>
-                <TouchableOpacity style={styles.swapBtn}>
-                    <Text style={styles.actionBtnText}>Swap</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sendBtn}>
-                    <Text style={styles.actionBtnText}>Send {symbol.toUpperCase()}</Text>
-                </TouchableOpacity>
+            {/* Bid / Ask Panel boxes */}
+            <View style={styles.bidAskPanel}>
+                <View style={styles.bidAskBox}>
+                    <Text style={styles.bidAskTitle}>SELL (BID)</Text>
+                    <Text style={[styles.bidAskValue, { color: ColorTheme.trendingRed }]}>
+                        {bidPrice.toFixed(decimalPlaces)}
+                    </Text>
+                </View>
+                <View style={styles.bidAskBox}>
+                    <Text style={styles.bidAskTitle}>BUY (ASK)</Text>
+                    <Text style={[styles.bidAskValue, { color: ColorTheme.trendingGreen }]}>
+                        {askPrice.toFixed(decimalPlaces)}
+                    </Text>
+                </View>
             </View>
         </View>
     );
@@ -205,7 +238,6 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         backgroundColor: "black",
         paddingHorizontal: 20,
     },
@@ -214,34 +246,27 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        height: responsiveScreenHeight(40),
+        height: 250,
     },
     header: {
-        marginTop: 20,
+        marginTop: 15,
         alignItems: "flex-start",
     },
-    iconContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: "#1A1A1A",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: "#333",
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 8,
     },
-    logo: {
-        width: 35,
-        height: 35,
-        resizeMode: "contain",
-    },
-    title: {
+    symbolText: {
         color: "white",
-        fontSize: 24,
+        fontSize: 26,
         fontFamily: "Archivo-ExtraBold",
         fontWeight: "bold",
-        marginBottom: 5,
+    },
+    nameText: {
+        color: ColorTheme.grey,
+        fontSize: 14,
+        fontFamily: "Archivo-Regular",
     },
     priceContainer: {
         flexDirection: "row",
@@ -252,141 +277,131 @@ const styles = StyleSheet.create({
     },
     priceMainText: {
         color: "white",
-        fontSize: 28,
+        fontSize: 32,
         fontFamily: "Archivo-ExtraBold",
         fontWeight: "bold",
     },
     changeBadge: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
         gap: 4,
     },
     changeText: {
-        fontSize: 16,
+        fontSize: 13,
         fontFamily: "Archivo-ExtraBold",
         fontWeight: "bold",
     },
     chartWrapper: {
-        height: 250,
-        marginVertical: 20,
+        height: 220,
+        marginTop: 15,
+        marginBottom: 5,
         justifyContent: "center",
         alignItems: "center",
     },
     timeIntervals: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginVertical: 10,
-        paddingHorizontal: 10,
+        marginVertical: 12,
     },
     intervalBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        flex: 1,
+        height: 32,
+        marginHorizontal: 3,
+        borderRadius: 8,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#0A0A0A",
+        backgroundColor: "#110A1F",
+        borderWidth: 1,
+        borderColor: "#25173F",
     },
     activeIntervalBtn: {
         backgroundColor: ColorTheme.vibrantPurple,
+        borderColor: ColorTheme.vibrantPurple,
     },
     intervalText: {
         color: ColorTheme.grey,
-        fontSize: 14,
+        fontSize: 11,
         fontWeight: "bold",
+        fontFamily: "Archivo-ExtraBold",
     },
     activeIntervalText: {
         color: "white",
     },
-    balanceInfo: {
-        flexDirection: "row",
-        backgroundColor: "#0A0A0A",
-        borderRadius: 25,
-        padding: 24,
-        marginTop: 20,
+    rangeContainer: {
+        marginVertical: 14,
+        padding: 16,
+        backgroundColor: "#0D071B",
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#1A1A1A",
+        borderColor: "#23163A",
     },
-    infoCol: {
-        flex: 1,
-        alignItems: "flex-start",
+    rangeRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
     },
-    verticalDivider: {
-        width: 1,
-        backgroundColor: "#1A1A1A",
-        marginHorizontal: 15,
-    },
-    infoLabel: {
+    rangeLabel: {
         color: ColorTheme.grey,
-        fontSize: 14,
-        marginBottom: 10,
+        fontSize: 11,
         fontFamily: "Archivo-Regular",
     },
-    infoValueRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
+    rangeBarTrack: {
+        height: 4,
+        backgroundColor: "#201235",
+        borderRadius: 2,
+        position: 'relative',
+        marginBottom: 6,
     },
-    infoIcon: {
-        width: 24,
-        height: 24,
-        resizeMode: "contain",
+    rangeBarActive: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: ColorTheme.chartGold,
+        position: 'absolute',
+        top: -3,
+        shadowColor: ColorTheme.chartGold,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 4,
     },
-    dollarIconWrapper: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: "#333",
-        justifyContent: "center",
-        alignItems: "center",
+    rangePriceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
     },
-    dollarIcon: {
-        color: "white",
-        fontSize: 14,
-        fontWeight: "bold",
-    },
-    infoValue: {
-        color: "white",
-        fontSize: 22,
-        fontWeight: "bold",
+    rangePriceText: {
+        color: 'white',
+        fontSize: 11,
         fontFamily: "Archivo-ExtraBold",
+        fontWeight: 'bold',
     },
-    walletNote: {
-        textAlign: "center",
-        color: ColorTheme.grey,
-        marginTop: 25,
-        fontSize: 14,
-        fontFamily: "Archivo-Regular",
-    },
-    actions: {
-        flexDirection: "row",
-        marginTop: 30,
+    bidAskPanel: {
+        flexDirection: 'row',
         gap: 15,
-        paddingBottom: 40,
+        marginBottom: 10,
     },
-    swapBtn: {
+    bidAskBox: {
         flex: 1,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: "#1A1A1A", // Match reference image dark button
-        justifyContent: "center",
-        alignItems: "center",
+        backgroundColor: "#0F0A1F",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "#25173F",
+        padding: 14,
+        alignItems: 'center',
     },
-    sendBtn: {
-        flex: 1.5,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: ColorTheme.vibrantPurple,
-        justifyContent: "center",
-        alignItems: "center",
+    bidAskTitle: {
+        color: ColorTheme.grey,
+        fontSize: 10,
+        fontFamily: "Archivo-Regular",
+        letterSpacing: 1.0,
+        marginBottom: 6,
     },
-    actionBtnText: {
-        color: "white",
-        fontSize: 16,
-        fontWeight: "bold",
+    bidAskValue: {
+        fontSize: 18,
         fontFamily: "Archivo-ExtraBold",
+        fontWeight: "bold",
     },
 });
 

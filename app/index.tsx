@@ -17,14 +17,14 @@ export default function SplashScreen() {
     return (
         <View style={splashStyles.container}>
             <View style={[splashStyles.topBlock, splashStyles.flexEnd, splashStyles.bodyColor]}>
-                <Text style={[splashStyles.faintedText, splashStyles.textStart]}>COIN</Text>
+                <Text style={[splashStyles.faintedText, splashStyles.textStart]}>TRADE</Text>
             </View>
             <View style={[splashStyles.centerBlock, splashStyles.flexCenter, splashStyles.bodyColor]}>
                 <Logo />
-                <Text style={[splashStyles.normalText, splashStyles.marginTopSmall]}>Coinflow</Text>
+                <Text style={[splashStyles.normalText, splashStyles.marginTopSmall]}>TradeIQ</Text>
             </View>
             <View style={[splashStyles.bottomBlock, splashStyles.flexStart, splashStyles.bodyColor]}>
-                <Text style={[splashStyles.faintedText, splashStyles.textStart]}>FLOW</Text>
+                <Text style={[splashStyles.faintedText, splashStyles.textStart]}>IQ</Text>
             </View>
         </View>
     );

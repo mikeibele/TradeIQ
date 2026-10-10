@@ -1,9 +1,9 @@
 import 'dotenv/config';
 
 export default {
-  name: "ToidFX",
-  slug: "ToidFX",
-  scheme: "toidfx",
+  name: "TradeIQ",
+  slug: "TradeIQ",
+  scheme: "tradeiq",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -21,7 +21,7 @@ export default {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#ffffff"
     },
-    package: "com.king_ibele.ToidFX"
+    package: "com.king_ibele.TradeIQ"
   },
   web: {
     favicon: "./assets/favicon.png"
@@ -38,6 +38,9 @@ export default {
     "expo-asset",
     "expo-mail-composer",
     "expo-secure-store",
+    "expo-image",
+    "expo-sqlite",
+    "expo-status-bar",
     [
       "expo-splash-screen",
       {
