@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ToidFX
 
 **Toid FX – Your Ultimate Crypto Price Tracking Companion**
@@ -50,3 +51,6 @@ If you have any questions or concerns regarding this Privacy Policy, please cont
 
 📩 **kingkenamu@gmail.com**
 
+=======
+# TradeIQ
+>>>>>>> origin/main
